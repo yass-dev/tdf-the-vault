@@ -1,0 +1,38 @@
+name: Onboard
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  onboard:
+    runs-on: ubuntu-latest
+    environment: vault-ops
+
+    steps:
+      - name: Run the-internal-vault
+        uses: yass-dev/the-internal-vault@main
+        with:
+          master-key: ${{ secrets.MASTER_KEY }}
+
+      - name: Checkout the-internal-vault
+        uses: actions/checkout@v5.0.1
+        with:
+          repository: yass-dev/the-internal-vault
+          token: ${{ secrets.INTERNAL_PAT }}
+          path: internal
+
+      - name: Checkout vault branch
+        uses: actions/checkout@v5.0.1
+        with:
+          ref: vault
+          path: vault-data
+          token: ${{ secrets.VAULT_PAT }}
+
+      - name: Onboard actor
+        env:
+          ACTOR: ${{ github.actor }}
+        working-directory: vault-data
+        run: bash "$GITHUB_WORKSPACE/internal/scripts/onboard.sh"

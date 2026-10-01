@@ -1,0 +1,49 @@
+name: Save
+
+on:
+  workflow_dispatch:
+    inputs:
+      filename:
+        description: 'Name for this vault file'
+        required: true
+        type: string
+      content:
+        description: 'Content to store'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  save:
+    runs-on: ubuntu-latest
+    environment: vault-ops
+
+    steps:
+      - name: Run the-internal-vault
+        uses: yass-dev/the-internal-vault@main
+        with:
+          master-key: ${{ secrets.MASTER_KEY }}
+
+      - name: Checkout the-internal-vault
+        uses: actions/checkout@v5.0.1
+        with:
+          repository: yass-dev/the-internal-vault
+          token: ${{ secrets.INTERNAL_PAT }}
+          path: internal
+
+      - name: Checkout vault branch
+        uses: actions/checkout@v5.0.1
+        with:
+          ref: vault
+          path: vault-data
+          token: ${{ secrets.VAULT_PAT }}
+
+      - name: Save to vault
+        env:
+          ACTOR: ${{ github.actor }}
+          FILENAME: ${{ inputs.filename }}
+          CONTENT: ${{ inputs.content }}
+        working-directory: vault-data
+        run: bash "$GITHUB_WORKSPACE/internal/scripts/save.sh"

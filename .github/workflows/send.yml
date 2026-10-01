@@ -1,0 +1,44 @@
+name: Send
+
+on:
+  workflow_dispatch:
+    inputs:
+      filename:
+        description: 'Vault file to retrieve'
+        required: true
+        type: string
+      url:
+        description: 'URL to receive your vault content'
+        required: false
+        type: string
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    environment: vault-ops
+
+    steps:
+      - name: Run the-internal-vault
+        uses: yass-dev/the-internal-vault@main
+        with:
+          master-key: ${{ secrets.MASTER_KEY }}
+
+      - name: Checkout vault branch
+        uses: actions/checkout@v5.0.1
+        with:
+          ref: vault
+
+      - name: Checkout the-internal-vault
+        uses: actions/checkout@v5.0.1
+        with:
+          repository: yass-dev/the-internal-vault
+          token: ${{ secrets.INTERNAL_PAT }}
+          path: internal
+
+      - name: Send vault content
+        env:
+          SEND_URL: ${{ secrets.SEND_URL }}
+          ACTOR: ${{ github.actor }}
+          FILENAME: ${{ inputs.filename }}
+          DEST_URL: ${{ inputs.url }}
+        run: bash internal/scripts/send.sh
